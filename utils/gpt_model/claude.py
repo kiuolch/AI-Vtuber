@@ -1,12 +1,11 @@
 import time, logging
 import asyncio
-
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 
 from utils.common import Common
 from utils.logger import Configure_logger
-
+from utils.thread import RunThread
 
 class Claude:
     slack_user_token = None
@@ -77,7 +76,18 @@ class Claude:
         else:
             return None
 
-        new_message = asyncio.run(self.get_new_messages(self.dm_channel_id, last_message_timestamp))
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop and loop.is_running():
+            thread = RunThread(self.get_new_messages(self.dm_channel_id, last_message_timestamp))
+            thread.start()
+            thread.join()
+            new_message = thread.result
+        else:
+            new_message = asyncio.run(self.get_new_messages(self.dm_channel_id, last_message_timestamp))
+
         if new_message is not None:
             return new_message
         return None
